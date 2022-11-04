@@ -5,24 +5,26 @@ import (
 	"fmt"
 	"net"
 	"os"
-	"strconv"
 	"strings"
-	"sync"
 	"time"
 
-	"./mylog"
+	"github.com/schollz/progressbar"
+	log "github.com/sirupsen/logrus"
 	"golang.org/x/crypto/ssh"
 )
 
 var (
-	bar     = NewBarWithGraph(0, 100, "#")
+	bar     = progressbar.Default(100)
 	sshPort = 22
 	sshUser = "root"
 )
 
 func initData() map[string]string {
+	log.SetLevel(log.InfoLevel)
+	log.SetFormatter(&log.JSONFormatter{})
 	var countryCapitalMap map[string]string
 	countryCapitalMap = make(map[string]string)
+	fmt.Println()
 	fmt.Println("请任意原环境输入ip：示例：127.0.0.1，注意：如果是当前服务器请使用：127.0.0.1")
 	var sourceSshHost string
 	reader := bufio.NewReader(os.Stdin)
@@ -31,17 +33,14 @@ func initData() map[string]string {
 	if sourceSshHost == "" {
 		sourceSshHost = "34.205.125.129"
 	}
-	bar.Add(1)
 	fmt.Printf("输入的原主机ip：%s,进行ip正确性校验\n", sourceSshHost)
 	address := net.ParseIP(sourceSshHost)
 	if address == nil {
-		mylog.Error.Fatal("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
-		bar.Add(1)
+		log.Fatal("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
 		os.Exit(0)
 	} else {
 		countryCapitalMap["sourceSshHost"] = sourceSshHost
-		bar.Add(1)
-		mylog.Info.Println("原ip地址格式正确,继续运行....")
+		log.Println("原ip地址格式正确,继续运行....")
 	}
 	fmt.Println("请任意迁移环境输入ip：示例：127.0.0.1")
 	var targetSshHost string
@@ -54,13 +53,11 @@ func initData() map[string]string {
 	fmt.Printf("输入的迁移主机ip：%s,进行ip正确性校验\n", targetSshHost)
 	address = net.ParseIP(targetSshHost)
 	if address == nil {
-		mylog.Info.Println("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
-		bar.Add(1)
+		log.Println("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
 		os.Exit(0)
 	}
 	countryCapitalMap["targetSshHost"] = targetSshHost
-	bar.Add(2)
-	mylog.Info.Println("\n原ip地址格式正确,继续运行....")
+	log.Println("原ip地址格式正确,继续运行....")
 	fmt.Println("输入的主机密码：注意原主机和迁移主机密码需要一致否则无法进行迁移")
 	var passwd string
 	reader2 := bufio.NewReader(os.Stdin)
@@ -74,7 +71,7 @@ func initData() map[string]string {
 
 }
 func getDockerMap() map[string]string {
-	mylog.Info.Println("示例如下：docker run -d --security-opt seccomp:unconfined（请输入docker运行时候的参数）  --name looper（请输入需要创建的docker名称）  busybox（请输入需要使用的镜像名称如：busybox） /bin/sh -c \"i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done\"（docker命令行）")
+	log.Println("示例如下：docker run -d --security-opt seccomp:unconfined（请输入docker运行时候的参数）  --name looper（请输入需要创建的docker名称）  busybox（请输入需要使用的镜像名称如：busybox） /bin/sh -c \"i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done\"（docker命令行）")
 	var dockerCapitalMap map[string]string
 	dockerCapitalMap = make(map[string]string)
 	fmt.Println("请输入docker运行时候的参数，如：--security-opt seccomp:unconfined")
@@ -120,8 +117,8 @@ func getSession(client *ssh.Client) *ssh.Session {
 	session, err := client.NewSession()
 
 	if err != nil {
-		bar.load()
-		mylog.Info.Fatal("创建ssh session 失败", err)
+		bar.State()
+		log.Fatal("创建ssh session 失败", err)
 	}
 	return session
 }
@@ -139,175 +136,235 @@ func main() {
 
 	getStep("第一步：用户信息初始化")
 	countryCapitalMap := initData()
+	fmt.Println()
+	bar.Add(4)
 	getStep("第二步：获取docker运行参数")
 	dockerCapitalMap := getDockerMap()
+	fmt.Println()
+	bar.Add(4)
+	fmt.Println()
 	getStep("第三步：原服务器开始进行初始化")
 	client := toObtainSshClient(countryCapitalMap["sourceSshHost"], sshPort, countryCapitalMap["passwd"], sshUser)
 
-	bar.Add(4)
+	bar.Add(1)
+	fmt.Println()
+
+	getStep("第四步：原服务器任务开始执行创建镜像任务")
 	session := getSession(client)
 	err2 := session.Run(fmt.Sprintf("docker ps -a| grep %s  | gawk '{cmd=\"docker stop \"$1; system(cmd)}' && docker ps -a| grep %s  | gawk '{cmd=\"docker rm \"$1; system(cmd)}'", dockerCapitalMap["dockerName"],
 		dockerCapitalMap["dockerName"]))
-	mylog.Debug.Println(fmt.Sprintf("docker ps -a| grep %s  | gawk '{cmd=\"docker stop \"$1; system("+
+	log.Debugln(fmt.Sprintf("docker ps -a| grep %s  | gawk '{cmd=\"docker stop \"$1; system("+
 		"cmd)}' && docker ps | grep %s  -a| gawk '{cmd=\"docker rm \"$1; system(cmd)}'", dockerCapitalMap["dockerName"],
 		dockerCapitalMap["dockerName"]))
 	if err2 != nil {
-		mylog.Error.Fatal("docker任务执行", err2)
-		bar.load()
+		// bar.load()
+		log.Fatalln("docker任务执行失败", err2)
 		os.Exit(0)
 	}
 	closeSession(session)
+	fmt.Println()
+	bar.Add(5)
+	fmt.Println()
 	session = getSession(client)
 	dockerRun := fmt.Sprintf("docker run -d --name %s %s %s  %s ", dockerCapitalMap["dockerName"],
 		dockerCapitalMap["dockerRunScript"], dockerCapitalMap["dockerImage"], dockerCapitalMap["script"])
-	mylog.Debug.Println(fmt.Sprintf("执行命令：%s", dockerRun))
-	_ = fmt.Sprintf("docker exec -i %s cat /proc/self/cgroup | head -1 |awk -F '/' '{print $NF}'", dockerCapitalMap["dockerName"])
-	closeSession(session)
+	log.Debugf("执行命令：%s", dockerRun)
 	time.Sleep(5 * time.Second)
-
-	// 1.创建docker进程
-	session = getSession(client)
 	combo, err := session.CombinedOutput(dockerRun)
 	if err != nil {
-		mylog.Error.Fatal("docker任务执行,创建镜像失败", err)
-		bar.load()
+		// bar.load()
+		log.Fatalln("docker任务执行,创建镜像失败", err)
+
 		os.Exit(0)
 	}
-	mylog.Debug.Println(fmt.Sprintf("命令输出:%s", string(combo)))
+	log.Printf("命令输出:%s", strings.TrimSpace(string(combo)))
 	// 2.获取containerId
 	containerId := string(combo)
-
 	closeSession(session)
-	mylog.Info.Printf("等待日志，静候30s....")
+	fmt.Println()
+	bar.Add(6)
+	fmt.Println()
+	getStep("第五步：等待日志生成，方便形成日志差异化")
+	log.Printf("等待日志，静候30s....")
 	time.Sleep(20 * time.Second)
-	mylog.Info.Printf("继续执行....")
+	log.Printf("继续执行....")
+	fmt.Println()
+	bar.Add(2)
+	fmt.Println()
+	getStep("第六步：创建checkpoint")
 	session = getSession(client)
 	// 3.创建checkpoint
 	checkPoint := fmt.Sprintf("docker checkpoint create %s c1", dockerCapitalMap["dockerName"])
-	mylog.Debug.Println(checkPoint)
+	log.Debugln(checkPoint)
 	_, err1 := session.CombinedOutput(checkPoint)
 
 	if err1 != nil {
-		mylog.Error.Fatal("docker任务执行,checkpoint执行失败", err1)
-		bar.load()
+		// bar.load()
+		log.Fatalln("docker任务执行,checkpoint执行失败", err1)
 		os.Exit(0)
 	}
 	closeSession(session)
+	fmt.Println()
+	bar.Add(3)
+	fmt.Println()
+	getStep("第七步：开启应用转镜像任务")
 	session = getSession(client)
 	// 4. 转换为镜像
 	commit := fmt.Sprintf("docker commit %s checkpoint", strings.TrimSpace(containerId))
-	mylog.Debug.Println(commit)
+	log.Debugln(commit)
 	err = session.Run(commit)
 	if err != nil {
-		mylog.Error.Fatal("docker任务执行,转换为镜像失败", err)
-		bar.load()
+		// bar.load()
+		log.Fatalln("docker任务执行,转换为镜像失败", err)
 		os.Exit(0)
 	}
 	closeSession(session)
+	fmt.Println()
+	bar.Add(3)
+	fmt.Println()
+	getStep("第八步：开启保存本地任务")
 	session = getSession(client)
 	// 5.导出镜像
 	save := "docker save -o /opt/checkpoint checkpoint"
-	mylog.Debug.Println(save)
+	log.Debugln(save)
 	err = session.Run(save)
 	if err != nil {
-		mylog.Error.Fatal("docker任务执行,导出为镜像包失败", err)
-		bar.load()
+		// bar.load()
+		log.Fatalln("docker任务执行,导出为镜像包失败", err)
 		os.Exit(0)
 	}
 	closeSession(session)
+	fmt.Println()
+	bar.Add(2)
+	fmt.Println()
+	getStep("第八步：获取源环境的全量日志")
 	session = getSession(client)
 	// 6.获取当前操作镜像的最后一行日志
 	scanLog := fmt.Sprintf("docker logs -f   %s ", dockerCapitalMap["dockerName"])
-	mylog.Info.Println(scanLog)
+	log.Println(scanLog)
 	combo, err = session.CombinedOutput(scanLog)
 	if err != nil {
-		mylog.Error.Fatal("docker任务执行,查看日志失败", err)
+		// bar.load()
+		log.Fatalln("docker任务执行,查看日志失败", err)
 		os.Exit(0)
 	}
 	tailLogBySource := string(combo)
 
 	closeSession(session)
+	fmt.Println()
+	bar.Add(5)
+	fmt.Println()
+	getStep("第九步：开启发送到迁移主机任务")
 	session = getSession(client)
 	// 7.发送镜像包
 	scp := fmt.Sprintf("scp /opt/checkpoint root@%s:/opt/checkpoint", countryCapitalMap["targetSshHost"])
-	mylog.Debug.Println(scp)
+	log.Debugln(scp)
 	combo, err = session.CombinedOutput(scp)
 	if err != nil {
-		mylog.Error.Fatal("docker任务执行,发送镜像包失败", err)
+		// bar.load()
+		log.Fatalln("docker任务执行,发送镜像包失败", err)
 		os.Exit(0)
 	}
 	closeSession(session)
 
+	fmt.Println()
+	bar.Add(15)
+	fmt.Println()
+	getStep("第十步：进入迁移主机服务器，开始执行任务")
 	// 8.进入target服务器
 	clientTarget := toObtainSshClient(countryCapitalMap["targetSshHost"], sshPort, countryCapitalMap["passwd"], sshUser)
 	session = getSession(clientTarget)
 	err2 = session.Run(fmt.Sprintf("docker ps -a| grep %s  | gawk '{cmd=\"docker stop \"$1; system(cmd)}' && docker ps -a| grep %s  | gawk '{cmd=\"docker rm \"$1; system(cmd)}'", dockerCapitalMap["dockerName"],
 		dockerCapitalMap["dockerName"]))
 	if err2 != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行", err2)
-		bar.load()
+		// bar.load()
+		log.Fatalln("迁移主机上docker任务执行", err2)
 		os.Exit(0)
 	}
 	closeSession(session)
+	bar.Add(1)
+	getStep("第十一步：进入迁移主机服务器，执行load命令")
 	session = getSession(clientTarget)
 	// 9.执行target load命令
 	load := "docker load -i /opt/checkpoint"
-	mylog.Debug.Println(load)
+	log.Println(load)
 	err = session.Run(load)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务,导入镜像包失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务,导入镜像包失败", err)
 		os.Exit(0)
 	}
 	closeSession(session)
+	fmt.Println()
+	bar.Add(4)
+	fmt.Println()
+	getStep("第十二步：进入迁移主机服务器，开启创建任务")
 	session = getSession(clientTarget)
 	// 10.创建任务
 	dockerRunTarget := fmt.Sprintf("docker run -d --name %s %s %s  %s && docker stop %s", dockerCapitalMap["dockerName"],
 		dockerCapitalMap["dockerRunScript"], "checkpoint", dockerCapitalMap["script"], dockerCapitalMap["dockerName"])
-	mylog.Debug.Println(dockerRunTarget)
+	log.Debugln(dockerRunTarget)
 	combo, err = session.CombinedOutput(dockerRunTarget)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行,创建镜像包失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务执行,创建镜像包失败", err)
 		os.Exit(0)
 	}
 	time.Sleep(5 * time.Second)
 	containerIdTarget := strings.Split(string(combo), "\n")[0]
 	closeSession(session)
+	fmt.Println()
+	bar.Add(10)
+	fmt.Println()
+	getStep("第十三步：进入源主机，进行拷贝checkpoint到迁移节点")
 	session = getSession(client)
 	// 11.拷贝checkpoint到目的节点
 	scpCheckPoint := fmt.Sprintf(
 		"scp -r /var/lib/docker/containers/%s/checkpoints/c1/ root@%s:/var/lib/docker/containers/%s/checkpoints/",
 		strings.TrimSpace(containerId), countryCapitalMap["targetSshHost"], strings.TrimSpace(containerIdTarget))
-	mylog.Debug.Println(scpCheckPoint)
+	log.Debugln(scpCheckPoint)
 	err = session.Run(scpCheckPoint)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行,拷贝checkpoint到目的节点失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务执行,拷贝checkpoint到目的节点失败", err)
 		os.Exit(0)
 	}
 	time.Sleep(5 * time.Second)
 	closeSession(session)
+
 	session = getSession(client)
 	// 12.启动容器
 	scpCheckPointTarget := fmt.Sprintf(
 		"scp -r /var/lib/docker/containers/%s/checkpoints/c1/ root@%s:/var/lib/docker/containers/%s/checkpoints/",
 		strings.TrimSpace(containerId), countryCapitalMap["targetSshHost"], strings.TrimSpace(containerIdTarget))
-	mylog.Debug.Println(scpCheckPointTarget)
+	log.Debugln(scpCheckPointTarget)
 	err = session.Run(scpCheckPointTarget)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行,拷贝checkpoint到目的节点失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务执行,拷贝checkpoint到目的节点失败", err)
 		os.Exit(0)
 	}
 	// 13. 恢复位点差
 	checkPointTarget := fmt.Sprintf("docker start --checkpoint c1 %s", strings.TrimSpace(containerIdTarget))
-	mylog.Debug.Println(checkPointTarget)
+	log.Debugln(checkPointTarget)
 	closeSession(session)
+	fmt.Println()
+	bar.Add(20)
+	fmt.Println()
+	getStep("第十三步：进入迁移主机，恢复位点差")
 	session = getSession(clientTarget)
 	combo, err = session.CombinedOutput(checkPointTarget)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行,启动checkPoint失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务执行,启动checkPoint失败", err)
 		os.Exit(0)
 	}
-	mylog.Info.Printf("命令输出:%s\n", string(combo))
+	log.Println("命令输出:%s", strings.TrimSpace(string(combo)))
 	closeSession(session)
+	fmt.Println()
+	bar.Add(10)
+	fmt.Println()
+	getStep("第十四步：进入迁移主机，进行日志全量获取")
 	session = getSession(clientTarget)
 	// 13.再次检查进程日志正常，接着上次创建checkpoint的时间点打印
 	scanLogTarget := fmt.Sprintf(
@@ -315,25 +372,32 @@ func main() {
 	time.Sleep(5 * time.Second)
 	combo, err = session.CombinedOutput(scanLogTarget)
 	if err != nil {
-		mylog.Error.Fatal("迁移主机上docker任务执行,日志获取失败", err)
+		// bar.load()
+		log.Errorln("迁移主机上docker任务执行,日志获取失败", err)
 		os.Exit(0)
 	}
-	mylog.Info.Printf("打印原主机日志：\n%s\n", tailLogBySource)
+	bar.Add(5)
+	fmt.Println()
+	log.Println("打印原主机日志：")
 
-	mylog.Info.Printf("打印迁移主机日志：\n%s\n", string(combo))
+	fmt.Println(tailLogBySource)
+
+	log.Printf("打印迁移主机日志：")
+	fmt.Println(string(combo))
 
 	defer func(client *ssh.Client) {
 		var err = client.Close()
 		if err != nil {
-
 		}
 	}(client)
 	defer func(client *ssh.Client) {
 		var err = client.Close()
 		if err != nil {
-
 		}
 	}(clientTarget)
+	fmt.Println()
+
+	getStep("bye")
 }
 
 func toObtainSshClient(host string, sshPort int, passwd string, user string) *ssh.Client {
@@ -348,8 +412,8 @@ func toObtainSshClient(host string, sshPort int, passwd string, user string) *ss
 	addr := fmt.Sprintf("%s:%d", host, sshPort)
 	sshClient, err := ssh.Dial("tcp", addr, config)
 	if err != nil {
-		bar.load()
-		mylog.Error.Fatal("创建ssh client 失败", err)
+		// bar.load()
+		log.Errorln("创建ssh client 失败", err)
 	}
 
 	return sshClient
@@ -358,76 +422,4 @@ func toObtainSshClient(host string, sshPort int, passwd string, user string) *ss
 func getStep(message string) string {
 	return fmt.Sprintf("=================================%s====================================================", message)
 
-}
-
-type Bar struct {
-	mu      sync.Mutex
-	graph   string    // 显示符号
-	rate    string    // 进度条
-	percent int       // 百分比
-	current int       // 当前进度位置
-	total   int       // 总进度
-	start   time.Time // 开始时间
-}
-
-func NewBar(current, total int) *Bar {
-	bar := new(Bar)
-	bar.current = current
-	bar.total = total
-	bar.start = time.Now()
-	if bar.graph == "" {
-		bar.graph = "█"
-	}
-	bar.percent = bar.getPercent()
-	for i := 0; i < bar.percent; i += 2 {
-		bar.rate += bar.graph // 初始化进度条位置
-	}
-	return bar
-}
-
-func NewBarWithGraph(start, total int, graph string) *Bar {
-	bar := NewBar(start, total)
-	bar.graph = graph
-	return bar
-}
-
-func (bar *Bar) getPercent() int {
-	return int((float64(bar.current) / float64(bar.total)) * 100)
-}
-
-func (bar *Bar) getTime() (s string) {
-	u := time.Now().Sub(bar.start).Seconds()
-	h := int(u) / 3600
-	m := int(u) % 3600 / 60
-	if h > 0 {
-		s += strconv.Itoa(h) + "h "
-	}
-	if h > 0 || m > 0 {
-		s += strconv.Itoa(m) + "m "
-	}
-	s += strconv.Itoa(int(u)%60) + "s"
-	return
-}
-
-func (bar *Bar) load() {
-	last := bar.percent
-	bar.percent = bar.getPercent()
-	if bar.percent != last && bar.percent%2 == 0 {
-		bar.rate += bar.graph
-	}
-	fmt.Printf("\n\r[%-50s]% 3d%%    %2s   %d/%d\n", bar.rate, bar.percent, bar.getTime(), bar.current, bar.total)
-}
-func (bar *Bar) Reset(current int) {
-	bar.mu.Lock()
-	defer bar.mu.Unlock()
-	bar.current = current
-	bar.load()
-
-}
-
-func (bar *Bar) Add(i int) {
-	bar.mu.Lock()
-	defer bar.mu.Unlock()
-	bar.current += i
-	bar.load()
 }
