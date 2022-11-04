@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"net"
 	"os"
@@ -20,7 +21,7 @@ var (
 )
 
 func initData() map[string]string {
-	log.SetLevel(log.InfoLevel)
+
 	log.SetFormatter(&log.JSONFormatter{})
 	var countryCapitalMap map[string]string
 	countryCapitalMap = make(map[string]string)
@@ -89,7 +90,7 @@ func getDockerMap() map[string]string {
 	script, _ = reader2.ReadString('\n')
 	script = strings.TrimSpace(script)
 	if script == "" {
-		script = "/bin/sh -c 'i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done'"
+		script = ""
 	}
 	dockerCapitalMap["script"] = script
 	fmt.Println("请输入需要创建的docker名称，如：looper")
@@ -133,6 +134,22 @@ func closeSession(session *ssh.Session) {
 	}(session)
 }
 func main() {
+	var level *int
+	level = flag.Int("level", 0, "debug level")
+	if level == nil {
+		log.SetLevel(log.InfoLevel)
+	}
+	level2 := *level
+	switch level2 {
+	case 1:
+		log.SetLevel(log.DebugLevel)
+	case 2:
+		log.SetLevel(log.ErrorLevel)
+	case 3:
+		log.SetLevel(log.WarnLevel)
+	default:
+		log.SetLevel(log.InfoLevel)
+	}
 
 	getStep("第一步：用户信息初始化")
 	countryCapitalMap := initData()
@@ -283,6 +300,7 @@ func main() {
 	}
 	closeSession(session)
 	bar.Add(1)
+	fmt.Println()
 	getStep("第十一步：进入迁移主机服务器，执行load命令")
 	session = getSession(clientTarget)
 	// 9.执行target load命令
