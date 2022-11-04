@@ -32,7 +32,7 @@ func initData() map[string]string {
 	sourceSshHost, _ = reader.ReadString('\n')
 	sourceSshHost = strings.TrimSpace(sourceSshHost)
 	if sourceSshHost == "" {
-		sourceSshHost = "34.205.125.129"
+		sourceSshHost = "10.203.56.7"
 	}
 	fmt.Printf("输入的原主机ip：%s,进行ip正确性校验\n", sourceSshHost)
 	address := net.ParseIP(sourceSshHost)
@@ -49,7 +49,7 @@ func initData() map[string]string {
 	targetSshHost, _ = reader1.ReadString('\n')
 	targetSshHost = strings.TrimSpace(targetSshHost)
 	if targetSshHost == "" {
-		targetSshHost = "44.212.35.1"
+		targetSshHost = "10.203.56.8"
 	}
 	fmt.Printf("输入的迁移主机ip：%s,进行ip正确性校验\n", targetSshHost)
 	address = net.ParseIP(targetSshHost)
@@ -65,7 +65,7 @@ func initData() map[string]string {
 	passwd, _ = reader2.ReadString('\n')
 	passwd = strings.TrimSpace(passwd)
 	if passwd == "" {
-		passwd = "shizeying"
+		passwd = "1"
 	}
 	countryCapitalMap["passwd"] = passwd
 	return countryCapitalMap
