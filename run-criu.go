@@ -159,7 +159,7 @@ func main() {
 		enableCompression = false
 	}
 	if enableCompression {
-		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,默认是：1")
+		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,默认是：3")
 		compression = getCommandStr()
 	}
 
@@ -284,7 +284,6 @@ func main() {
 	getStep("第八步：获取源环境的全量日志")
 	// 6.获取当前操作镜像的最后一行日志
 	scanLog := fmt.Sprintf("docker logs -f   %s ", dockerCapitalMap["dockerName"])
-	log.Println(scanLog)
 	tailLogBySource := combinedOutput(client, scanLog, "docker任务执行,查看日志失败")
 	getBar(5)
 	getStep("第九步：开启发送到迁移主机任务")
