@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"net"
@@ -69,9 +70,8 @@ func initData() map[string]string {
 }
 func getCommandStr() string {
 	var script string
-	// reader2 := bufio.NewReader(os.Stdin)
-	// script, _ = reader2.ReadString('\n')
-	script = ""
+	reader2 := bufio.NewReader(os.Stdin)
+	script, _ = reader2.ReadString('\n')
 	return strings.TrimSpace(script)
 }
 func getDockerMap() map[string]string {
