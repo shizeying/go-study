@@ -132,7 +132,7 @@ func main() {
 	var level *int
 	level = flag.Int("level", 0, "debug level")
 	if level == nil {
-		log.SetLevel(log.DebugLevel)
+		log.SetLevel(log.InfoLevel)
 	}
 	level2 := *level
 	switch level2 {
@@ -478,6 +478,7 @@ func run(client *ssh.Client, script string, error string) {
 func getBar(num int) {
 	log.Println("当前进度.................")
 	bar.Add(num)
+	fmt.Println()
 	log.Println("任务继续调度.................")
 
 }
