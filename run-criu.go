@@ -152,11 +152,11 @@ func main() {
 	getStep("第二步：获取docker运行参数")
 	dockerCapitalMap := getDockerMap()
 	getBar(4)
-	fmt.Println("本次任务是否开启压缩方式：Y或者N,默认是N")
+	fmt.Println("本次任务是否开启压缩方式：Y或者N,默认是Y")
 	var enable string
 	enable = getCommandStr()
-	if strings.EqualFold(enable, "y") {
-		enableCompression = true
+	if strings.EqualFold(enable, "n") {
+		enableCompression = false
 	}
 	if enableCompression {
 		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,默认是：1")
