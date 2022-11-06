@@ -159,7 +159,7 @@ func main() {
 		enableCompression = false
 	}
 	if enableCompression {
-		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,3.lz4,默认是：3")
+		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,4.lz4,默认是：3")
 		compression = getCommandStr()
 	}
 
@@ -272,7 +272,7 @@ func main() {
 			checkpointName = "checkpoint.snappy"
 		case "4":
 			log.Println("开启压缩镜像，使用lz4模式的高压缩率压缩")
-			compressionSc := "cd /opt/ && lz4 -9 -q -f checkpoint.tar.gz checkpoint.lz4&& ls -lh checkpoint.lz4|awk '{print $5}'"
+			compressionSc := "cd /opt/ && lz4 -9 -q -f checkpoint checkpoint.lz4&& ls -lh checkpoint.lz4|awk '{print $5}'"
 			size := combinedOutput(client, compressionSc, "使用lz4模式的高压缩率压缩解压缩失败")
 			log.Infof("压缩之后的镜像大小:%s", strings.TrimSpace(size))
 			checkpointName = "checkpoint.lz4"
