@@ -33,7 +33,7 @@ func initData() map[string]string {
 	var sourceSshHost string
 	sourceSshHost = getCommandStr()
 	if sourceSshHost == "" {
-		sourceSshHost = "10.203.56.7"
+		sourceSshHost = "10.203.56.77"
 	}
 	fmt.Printf("输入的原主机ip：%s,进行ip正确性校验\n", sourceSshHost)
 	address := net.ParseIP(sourceSshHost)
@@ -48,7 +48,7 @@ func initData() map[string]string {
 	var targetSshHost string
 	targetSshHost = getCommandStr()
 	if targetSshHost == "" {
-		targetSshHost = "10.203.56.8"
+		targetSshHost = "10.203.56.88"
 	}
 	fmt.Printf("输入的迁移主机ip：%s,进行ip正确性校验\n", targetSshHost)
 	address = net.ParseIP(targetSshHost)
@@ -89,7 +89,7 @@ func getDockerMap() map[string]string {
 	var script string
 	script = getCommandStr()
 	if script == "" {
-		script = "/bin/sh -c 'i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done'"
+		script = ""
 	}
 	dockerCapitalMap["script"] = script
 	fmt.Println("请输入需要创建的docker名称，如：looper")
@@ -159,7 +159,7 @@ func main() {
 		enableCompression = false
 	}
 	if enableCompression {
-		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,默认是：3")
+		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,3.lz4,默认是：3")
 		compression = getCommandStr()
 	}
 
@@ -270,6 +270,12 @@ func main() {
 			size := combinedOutput(client, compressionSc, "使用snappy模式的hadoop-snappy解压缩失败")
 			log.Infof("压缩之后的镜像大小:%s", strings.TrimSpace(size))
 			checkpointName = "checkpoint.snappy"
+		case "4":
+			log.Println("开启压缩镜像，使用lz4模式的高压缩率压缩")
+			compressionSc := "cd /opt/ && lz4 -9 -q -f checkpoint.tar.gz checkpoint.lz4&& ls -lh checkpoint.lz4|awk '{print $5}'"
+			size := combinedOutput(client, compressionSc, "使用lz4模式的高压缩率压缩解压缩失败")
+			log.Infof("压缩之后的镜像大小:%s", strings.TrimSpace(size))
+			checkpointName = "checkpoint.lz4"
 		default:
 			log.Println("开启压缩镜像，使用zip模式压缩")
 			compressionSc := "cd /opt/ && zip -r checkpoint.zip checkpoint  > /dev/null&&ls -lh checkpoint.zip | awk '{print $5}'"
@@ -312,15 +318,19 @@ func main() {
 		switch compression {
 		case "2":
 			log.Println("开启解压镜像，使用tar模式压缩")
-			compressionSc := "cd /opt/ && tar -zxvf checkpoint.tar.gz checkpoint"
+			compressionSc := "cd /opt/ && tar -zxvf checkpoint.tar.gz checkpoint&& rm -rf checkpoint.tar.gz"
 			run(clientTarget, compressionSc, "开启解压镜像，使用tar模式压缩任务失败")
 		case "3":
 			log.Println("开启解压镜像，使用snappy模式的hadoop-snappy压缩")
-			compressionSc := "cd /opt/ && snzip -d checkpoint.snappy"
+			compressionSc := "cd /opt/ && snzip -d checkpoint.snappy&&rm -rf checkpoint.snappy"
+			run(clientTarget, compressionSc, "开启解压镜像，使用snappy模式的hadoop-snappy压缩失败")
+		case "4":
+			log.Println("开启解压镜像，使用lz4模式压缩")
+			compressionSc := "cd /opt/ && lz4 -d --rm -f checkpoint.lz4"
 			run(clientTarget, compressionSc, "开启解压镜像，使用snappy模式的hadoop-snappy压缩失败")
 		default:
 			log.Println("开启解压镜像，使用zip模式压缩")
-			compressionSc := "unzip -q -n -d /opt/ /opt/checkpoint.zip"
+			compressionSc := "unzip -q -n -d /opt/ /opt/checkpoint.zip&& rm -rf /opt/checkpoint.zip"
 			run(clientTarget, compressionSc, "开启解压镜像，使用zip模式压缩失败")
 		}
 
@@ -357,6 +367,12 @@ func main() {
 			size := combinedOutput(client, compressionSc, "使用snappy模式的hadoop-snappy压缩失败")
 			log.Infof("压缩之后的checkpoints大小:%s", strings.TrimSpace(size))
 			checkpointsName = "archive.tar.sz"
+		case "4":
+			log.Println("开启checkpoints镜像，使用lz4模式压缩")
+			compressionSc := fmt.Sprintf("cd /var/lib/docker/containers/%s/checkpoints/ && tar -cf - c1 | lz4 -c -9 -f  > archive.tar.lz4  && ls -lh archive.tar.lz4|awk '{print $5}'", strings.TrimSpace(containerId))
+			size := combinedOutput(client, compressionSc, "使用snappy模式的hadoop-snappy压缩失败")
+			log.Infof("压缩之后的checkpoints大小:%s", strings.TrimSpace(size))
+			checkpointsName = "archive.tar.lz4"
 		default:
 			log.Println("开启checkpoints镜像，使用zip模式压缩")
 			compressionSc := fmt.Sprintf("cd /var/lib/docker/containers/%s/checkpoints/ && zip -r c1.zip c1 > /dev/null &&ls -lh c1.zip | awk '{print $5}'", strings.TrimSpace(containerId))
@@ -386,6 +402,10 @@ func main() {
 		case "3":
 			log.Println("开启解压checkpoints，使用snappy模式的hadoop-snappy压缩")
 			compressionSc := fmt.Sprintf("cd /var/lib/docker/containers/%s/checkpoints/ && snzip -dc archive.tar.sz | tar xf -&&rm -rf /var/lib/docker/containers/%s/checkpoints/archive.tar.sz", strings.TrimSpace(containerIdTarget), strings.TrimSpace(containerIdTarget))
+			run(clientTarget, compressionSc, "开启解压checkpoints，使用snappy模式的hadoop-snappy压缩失败")
+		case "4":
+			log.Println("开启解压checkpoints，使用lz4模式压缩")
+			compressionSc := fmt.Sprintf("cd /var/lib/docker/containers/%s/checkpoints/ && tar -I lz4 -xf archive.tar.lz4&&rm -rf /var/lib/docker/containers/%s/checkpoints/archive.tar.lz4", strings.TrimSpace(containerIdTarget), strings.TrimSpace(containerIdTarget))
 			run(clientTarget, compressionSc, "开启解压checkpoints，使用snappy模式的hadoop-snappy压缩失败")
 		default:
 			log.Println("开启解压checkpoints，使用zip模式压缩")
