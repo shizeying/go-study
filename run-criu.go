@@ -15,14 +15,14 @@ import (
 )
 
 var (
-	bar                = progressbar.Default(100)
+	bar                = progressbar.New(100)
 	sshPort            = 22
 	sshUser            = "root"
 	enableCompression  = true
 	enableCreateDocker = true
 	compression        = "3"
 	containerId        = ""
-	level              int
+	level              = 0
 )
 
 func initData() map[string]string {
@@ -114,7 +114,6 @@ func getSession(client *ssh.Client) *ssh.Session {
 	session, err := client.NewSession()
 
 	if err != nil {
-		bar.State()
 		log.Fatal("创建ssh session 失败", err)
 	}
 	return session
@@ -130,17 +129,12 @@ func closeSession(session *ssh.Session) {
 	}(session)
 }
 func init() {
-	// flag.BoolVar(&level, "help", false, "the usage of http server")
-	// flag.BoolVar(&version, "version", false, "the version of http server")
-	// flag.StringVar(&cfgPath, "cfgPath", "conf.yaml", "the config path of http server")
 	flag.IntVar(&level, "level", 0, "日志输出：0：info；1：debug;2:error;3.warning；默认0")
 }
 func main() {
-	if level == 0 {
-		log.SetLevel(log.InfoLevel)
-	}
 	flag.Parse()
 	fmt.Println(level)
+
 	switch level {
 	case 1:
 		log.SetLevel(log.DebugLevel)
