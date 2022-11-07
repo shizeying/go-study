@@ -18,57 +18,37 @@ var (
 	bar                = progressbar.New(100)
 	sshPort            = 22
 	sshUser            = "root"
+	containerId        = ""
 	enableCompression  = true
 	enableCreateDocker = true
-	compression        = "3"
-	containerId        = ""
-	level              = 0
+
+	compression     string
+	level           int
+	sourceSshHost   string
+	targetSshHost   string
+	passwd          string
+	dockerRunScript string
+	script          string
+	dockerName      string
+	dockerImage     string
+	enable          string
+	enable2         string
 )
 
-func initData() map[string]string {
-
-	log.SetFormatter(&log.JSONFormatter{})
-	var countryCapitalMap map[string]string
-	countryCapitalMap = make(map[string]string)
-	fmt.Println("请任意原环境输入ip：示例：127.0.0.1，注意：如果是当前服务器请使用：127.0.0.1")
-	var sourceSshHost string
-	sourceSshHost = getCommandStr()
-	if sourceSshHost == "" {
-		sourceSshHost = "10.203.56.77"
-	}
-	fmt.Printf("输入的原主机ip：%s,进行ip正确性校验\n", sourceSshHost)
-	address := net.ParseIP(sourceSshHost)
-	if address == nil {
-		log.Fatal("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
-		os.Exit(0)
-	} else {
-		countryCapitalMap["sourceSshHost"] = sourceSshHost
-		log.Println("原ip地址格式正确,继续运行....")
-	}
-	fmt.Println("请任意迁移环境输入ip：示例：127.0.0.1")
-	var targetSshHost string
-	targetSshHost = getCommandStr()
-	if targetSshHost == "" {
-		targetSshHost = "10.203.56.88"
-	}
-	fmt.Printf("输入的迁移主机ip：%s,进行ip正确性校验\n", targetSshHost)
-	address = net.ParseIP(targetSshHost)
-	if address == nil {
-		log.Println("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
-		os.Exit(0)
-	}
-	countryCapitalMap["targetSshHost"] = targetSshHost
-	log.Println("原ip地址格式正确,继续运行....")
-	fmt.Println("输入的主机密码：注意原主机和迁移主机密码需要一致否则无法进行迁移")
-	var passwd string
-	passwd = getCommandStr()
-	if passwd == "" {
-		passwd = "1"
-	}
-	countryCapitalMap["passwd"] = passwd
-	return countryCapitalMap
-
+func init() {
+	flag.IntVar(&level, "level", 0, "日志输出：0：info；1：debug;2:error;3.warning；默认0")
+	flag.StringVar(&sourceSshHost, "sourceSshHost", "10.203.56.77", "请任意原环境输入ip：示例：127.0.0.1，注意：如果是当前服务器请使用：127.0.0.1")
+	flag.StringVar(&targetSshHost, "targetSshHost", "10.203.56.88", "输入的迁移主机ip:：示例：127.0.0.1，注意：如果是迁移服务器请使用：127.0.0.1")
+	flag.StringVar(&passwd, "passwd", "ddjddjdgdgjjj", "主机密码，原主机和迁移主机需要密码一致，否则会无法操作")
+	flag.StringVar(&dockerRunScript, "dockerRunScript", "--security-opt seccomp:unconfined", "请输入docker运行时候的参数，如：--security-opt seccomp:unconfined")
+	flag.StringVar(&script, "script", "", "docker命令行，如：/bin/sh -c 'i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done'")
+	flag.StringVar(&dockerName, "dockerName", "looper", "请输入需要创建的docker名称，如：looper")
+	flag.StringVar(&dockerImage, "dockerImage", "centos", "请输入需要使用的镜像名称如：busybox")
+	flag.StringVar(&enable, "enable", "Y", "本次任务是否开启压缩方式：Y或者N,默认是Y")
+	flag.StringVar(&compression, "compression", "3", "请选择压缩类型：1：zip；2：tar；3.snappy,4.lz4,默认是：3")
+	flag.StringVar(&enable2, "enableCreate", "Y", "本次任务是否在宿主机进行容器创建：Y或者N,默认是Y")
 }
+
 func getCommandStr() string {
 	var script string
 	reader2 := bufio.NewReader(os.Stdin)
@@ -79,62 +59,43 @@ func getDockerMap() map[string]string {
 	log.Println("示例如下：docker run -d --security-opt seccomp:unconfined（请输入docker运行时候的参数）  --name looper（请输入需要创建的docker名称）  busybox（请输入需要使用的镜像名称如：busybox） /bin/sh -c \"i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done\"（docker命令行）")
 	var dockerCapitalMap map[string]string
 	dockerCapitalMap = make(map[string]string)
-	fmt.Println("请输入docker运行时候的参数，如：--security-opt seccomp:unconfined")
-	var dockerRunScript string
-	dockerRunScript = getCommandStr()
-	if dockerRunScript == "" {
-		dockerRunScript = "--security-opt seccomp:unconfined"
-	}
 	dockerCapitalMap["dockerRunScript"] = dockerRunScript
-	fmt.Println("docker命令行，如：/bin/sh -c 'i=0; while true; do echo $i; i=$(expr $i + 1); sleep 1; done'")
-	var script string
-	script = getCommandStr()
-	if script == "" {
-		script = ""
-	}
 	dockerCapitalMap["script"] = script
-	fmt.Println("请输入需要创建的docker名称，如：looper")
-	var dockerName string
-	dockerName = getCommandStr()
-	if dockerName == "" {
-		dockerName = "looper"
-	}
 	dockerCapitalMap["dockerName"] = dockerName
-	fmt.Println("请输入需要使用的镜像名称如：busybox")
-	var dockerImage string
-	dockerImage = getCommandStr()
-	if dockerImage == "" {
-		dockerImage = "centos"
-	}
 	dockerCapitalMap["dockerImage"] = dockerImage
-
 	return dockerCapitalMap
 }
-func getSession(client *ssh.Client) *ssh.Session {
-	session, err := client.NewSession()
 
-	if err != nil {
-		log.Fatal("创建ssh session 失败", err)
+func initData() map[string]string {
+
+	log.SetFormatter(&log.JSONFormatter{})
+	var countryCapitalMap map[string]string
+	countryCapitalMap = make(map[string]string)
+	fmt.Printf("输入的原主机ip：%s,进行ip正确性校验\n", sourceSshHost)
+	address := net.ParseIP(sourceSshHost)
+	if address == nil {
+		log.Fatal("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
+		os.Exit(0)
+	} else {
+		countryCapitalMap["sourceSshHost"] = sourceSshHost
+		log.Println("原ip地址格式正确,继续运行....")
 	}
-	return session
+
+	fmt.Printf("输入的迁移主机ip：%s,进行ip正确性校验\n", targetSshHost)
+	address = net.ParseIP(targetSshHost)
+	if address == nil {
+		log.Println("ip地址格式不正确，请重新运行程序，程序自动停止，bye")
+		os.Exit(0)
+	}
+	countryCapitalMap["targetSshHost"] = targetSshHost
+	log.Println("原ip地址格式正确,继续运行....")
+	countryCapitalMap["passwd"] = passwd
+	return countryCapitalMap
+
 }
 
-func closeSession(session *ssh.Session) {
-
-	defer func(session *ssh.Session) {
-		err := session.Close()
-		if err != nil {
-
-		}
-	}(session)
-}
-func init() {
-	flag.IntVar(&level, "level", 0, "日志输出：0：info；1：debug;2:error;3.warning；默认0")
-}
 func main() {
 	flag.Parse()
-	fmt.Println(level)
-
 	switch level {
 	case 1:
 		log.SetLevel(log.DebugLevel)
@@ -153,14 +114,8 @@ func main() {
 	dockerCapitalMap := getDockerMap()
 	getBar(4)
 	fmt.Println("本次任务是否开启压缩方式：Y或者N,默认是Y")
-	var enable string
-	enable = getCommandStr()
 	if strings.EqualFold(enable, "n") {
 		enableCompression = false
-	}
-	if enableCompression {
-		fmt.Println("请选择压缩类型：1：zip；2：tar；3.snappy,4.lz4,默认是：3")
-		compression = getCommandStr()
 	}
 
 	getStep("第三步：原服务器开始进行初始化")
@@ -170,8 +125,6 @@ func main() {
 
 	getStep("第四步：原服务器任务开始执行创建镜像任务")
 	fmt.Println("本次任务是否在宿主机进行容器创建：Y或者N,默认是Y")
-	var enable2 string
-	enable2 = getCommandStr()
 	if strings.EqualFold(enable2, "n") {
 		enableCreateDocker = false
 	}
@@ -182,8 +135,10 @@ func main() {
 		getBar(5)
 		checkImagesSc := fmt.Sprintf("if [ -z `docker images --format  '{{.Repository}}'  %s | grep %s  | awk 'END{print $1}'`]; then echo '不存在'; else echo '存在';  fi",
 			dockerCapitalMap["dockerImage"], dockerCapitalMap["dockerImage"])
+
 		s := combinedOutput(client, checkImagesSc, fmt.Sprintf("查找镜像【%s】失败", dockerCapitalMap["dockerImage"]))
 		if s == "不存在" {
+			log.Printf("本地不存在【%s】镜像，进行远程查找", dockerCapitalMap["dockerImage"])
 			searchImageSc := fmt.Sprintf("searchName=`docker search %s --format '{{.Name}}' | grep -E '^%s' | awk 'END{print $1}'` && if [ -z $searchName ]; then echo '不存在'; else echo '存在';  fi", dockerCapitalMap["dockerImage"], dockerCapitalMap["dockerImage"])
 			s2 := combinedOutput(client, searchImageSc, "查询镜像失败")
 			if s2 == "不存在" {
@@ -191,8 +146,11 @@ func main() {
 				os.Exit(0)
 
 			}
+
+			log.Printf("开启拉取【%s】镜像", dockerCapitalMap["dockerImage"])
 			pullImagesSc := fmt.Sprintf("docker pull %s", dockerCapitalMap["dockerImage"])
 			run(client, pullImagesSc, fmt.Sprintf("拉取镜像【%s】失败", dockerCapitalMap["dockerImage"]))
+			log.Printf("镜像【%s】拉取成功", dockerCapitalMap["dockerImage"])
 
 		}
 		dockerRun := fmt.Sprintf("docker run -d --name %s %s %s  %s ", dockerCapitalMap["dockerName"],
@@ -523,4 +481,23 @@ func toObtainSshClient(host string, sshPort int, passwd string, user string) *ss
 func getStep(message string) string {
 	return fmt.Sprintf("=================================%s====================================================", message)
 
+}
+
+func getSession(client *ssh.Client) *ssh.Session {
+	session, err := client.NewSession()
+
+	if err != nil {
+		log.Fatal("创建ssh session 失败", err)
+	}
+	return session
+}
+
+func closeSession(session *ssh.Session) {
+
+	defer func(session *ssh.Session) {
+		err := session.Close()
+		if err != nil {
+
+		}
+	}(session)
 }
