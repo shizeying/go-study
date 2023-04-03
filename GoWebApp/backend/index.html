@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Go Web App</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <h1>Go Web App</h1>
+    <form id="cmdForm">
+      <label>
+        日志输出等级：
+        <input type="number" id="level" value="0">
+      </label>
+      <label>
+        原环境IP：
+        <input type="text" id="sourceSshHost" value="10.203.56.77">
+      </label>
+      <label>
+        迁移主机IP：
+        <input type="text" id="targetSshHost" value="10.203.56.88">
+      </label>
+      <label>
+        主机密码：
+        <input type="password" id="passwd" value="ddjddjdgdgjjj">
+      </label>
+      <label>
+        Docker运行参数：
+        <input type="text" id="dockerRunScript" value="--security-opt seccomp:unconfined">
+      </label>
+      <label>
+        Docker命令行：
+        <input type="text" id="script" value="">
+      </label>
+      <label>
+        Docker名称：
+        <input type="text" id="dockerName" value="looper">
+      </label>
+      <label>
+        Docker镜像：
+        <input type="text" id="dockerImage" value="centos">
+      </label>
+      <label>
+        是否开启压缩：
+        <input type="text" id="enable" value="Y">
+      </label>
+      <label>
+        压缩类型：
+        <input type="number" id="compression" value="3">
+      </label>
+      <label>
+        是否在宿主机创建容器：
+        <input type="text" id="enable2" value="Y">
+      </label>
+      <button type="submit">提交</button>
+    </form>
+    <pre id="output"></pre>
+  </div>
+  <script src="main.js"></script>
+</body>
+</html>
